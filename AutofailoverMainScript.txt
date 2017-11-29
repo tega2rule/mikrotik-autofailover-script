@@ -1,0 +1,175 @@
+:global NumbIface [];
+:global IpAddA [];
+:global WANIface [];
+:global ArpEntr [];
+:global CanIP [];
+:global CantIP [];
+:global IpAddAreal [];
+:global pong2 [];
+:global content1 [];
+:global ArpEntrS [];
+:global a;
+:global b;
+:global c;
+:global Trunk [];
+:set NumbIface [];
+:set IpAddA [];
+:set WANIface [];
+:set ArpEntr [];
+:set CanIP [];
+:set CantIP [];
+:set pong2 [];
+:set ArpEntr [];
+:set ArpEntrS [];
+:set IpAddAreal [];
+:set a [];
+:set b [];
+:set c [];
+:set content1 [];
+:set Trunk {"ether2";"ether5";"ether6"}; /set the correct Trunk interfaces here
+
+:global content1 [];
+:global CanIP100 [];
+:global CantIP100 [];
+:global CanIP002 [];
+:global CanIP002 [];
+:global CanIP102 [];
+:global CanIP102 [];
+:global pong100 [];
+:global pong002 [];
+:global pong102 [];
+
+:global wanItface1 [];
+:global wanItface2 [];
+:global wanItface3 [];
+
+:global CantP100 [];
+:global CantIP100 [];
+:global CanIP002 [];
+:global CantIP002 [];
+:global CanIP102 [];
+:global CantIP102 [];
+:global atxtIP102 [];
+:global pong002 [];
+:global pong102 [];
+:global pong100 [];
+:set wanItface1 [];
+:set wanItface2 [];
+:set wanItface3 [];
+
+:set CanIP100 [];
+:set CantIP100 [];
+:set CanIP002 [];
+:set CantIP002 [];
+:set CanIP102 [];
+:set CantIP102 [];
+:set atxtIP102 [];
+
+:log info message="starting script"; 
+:delay 3;
+:foreach id in=[routing ospf interface find] do={ 
+	:if  ([routing ospf interface get $id neighbors  ]=1) do={
+		:set ArpEntr ($ArpEntr, "$[routing ospf interface get $id interface ]")}
+	
+	};
+
+:log info "$ArpEntr"
+:log info "checking all active interfaces from IP Arp entries ";
+:delay 7;
+:set ArpEntrS [:tostr $ArpEntr]; 
+:log info "$ArpEntrS  interfaces discovered, ";
+
+:log info message=" checking trunks ";
+:delay 3; 
+:foreach id in=[$Trunk] do={:foreach idTrunk in=[$ArpEntr] do={:if (($id=$idTrunk)) do={:set WANIface ($WANIface,"$id") }}}; 
+:delay 3; : log info "[$WANIface] trunk ports discovered,  ";
+:log info message=" collecting the loopback ip address for test to VDT CORE  ";
+:delay 3;
+:{local az [ip address find where interface=LOOPBACK0]; local z [ip address get $az address]; :set IpAddA ($IpAddA, [:pick $z 0 [:find $z "/"]])}
+:log info message="$IpAddA";
+:set NumbIface [:len $WANIface];
+log info $NumbIface;
+:log info " trunk interfaces found  ";
+:delay 3;
+:log info $WANIface ;
+:log info message="$WANIface trunk(s) ";
+:log info message="checking if loopback ip address is valid ip address from list of ....";
+:log info $IpAddA;
+:foreach i in=[$IpAddA] do={
+	:local pongz [ping count=3 $i]; if (($pongz>2)) do={:set IpAddAreal ($IpAddAreal, "$i")}
+	};
+:log info $IpAddAreal;
+:log info message=" loopback ip address is valid";
+:set a [:tostr $ArpEntr];
+:set b [:tostr $IpAddAreal];
+:set c [tostr $WANIface];
+:log info "interface found from IP adress list of router= $a ; ipadress found in Ip adresslist= $b ; trunk interfaces= $c";
+
+:set wanItface1 [:pick $WANIface 0];
+:set wanItface2 [:pick $WANIface 1];
+:set wanItface3 [:pick $WANIface 2];
+
+
+:if (($NumbIface>2)) do={:log info "disabling one trunk per time"; 
+		:foreach i in=[$WANIface] do={
+		
+		:delay 10;
+		:log info "disabling trunk IP address of $i:in 60 seconds";
+		:delay 60; :{local b [/ip address find where interface=$i]; foreach ibc in=$b do={/ip address disable $ibc}}
+		:log info "checking if local loopback0 can reach VDT CORE when ip address of $i is disabled";
+		:delay 15;
+		:set IpAddAreal [];
+		:foreach ib in=[$IpAddA] do={
+			:local pongz [ping count=5 $ib]; if (($pongz>2)) do={:set IpAddAreal ($IpAddAreal, "$ib")};
+			}
+		:log info $IpAddAreal;
+		:log info message=" loopback IP addresses is still valid";
+
+		:foreach ic in=[$IpAddAreal] do={
+			:set pong2 [ping count=5 src-address=$ic 172.27.11.2]; 
+			:if ((pong2>=3)) do={
+				:log info message="$ic can reach VDT CORE 172.27.11.2 it has $pong2 replies out of 5 pings";
+				:set CanIP ($CanIP,"$ic");
+				} else={ :log info message="$ic can not reach VDT CORE 172.27.11.2"; :set CantIP ($CantIP,"$ic");};
+			};
+		:log info "enabling back interface"; 
+		[local b [/ip address find where interface=$i]; foreach ibc in=$b do={ ip address enable $ibc}];
+		:delay 1;
+		:log info message="interface $i enabled ";
+		:delay 10;
+		
+		}
+		{:if (($NumbIface>2)) do={:local bb [system script find where name=AutofailoverScript1]; [system script run $bb] }}
+
+
+	} else={:log info "Aborting because of Trunk errors"}
+
+:set NumbIface [];
+:set IpAddA [];
+:set WANIface [];
+:set ArpEntr [];
+:set CanIP [];
+:set CantIP [];
+:set pong2 [];
+:set pong002 [];
+:set pong102 [];
+:set pong100 [];
+:set ArpEntrS [];
+:set IpAddAreal [];
+:set a [];
+:set b [];
+:set c [];
+:set content1 [];
+:set CantIP100 [];
+:set CanIP100 [];
+:set CanIP002 [];
+:set CantIP002 [];
+:set CanIP102 [];
+:set CantIP102 [];
+:set pong100 [];
+:set pong002 [];
+:set pong102 [];
+set wanItface1 [];
+set wanItface2 [];
+set wanItface3 [];
+
